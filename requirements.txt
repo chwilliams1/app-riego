@@ -5,3 +5,4 @@ numpy
 shapely
 opencv-python-headless
 fpdf
+packaging
