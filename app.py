@@ -7,24 +7,9 @@ from shapely.geometry import Point, Polygon
 from fpdf import FPDF
 import tempfile
 import os
-import base64
-from io import BytesIO
 
 # -----------------------------------------------------------------------------
-# 1. FUNCIÓN DE PARCHE (SOLUCIÓN PANTALLA NEGRA)
-# -----------------------------------------------------------------------------
-def convertir_imagen_a_base64(imagen_pil):
-    """
-    Convierte la imagen a texto (Base64) para que el Canvas
-    la pueda leer sin usar las funciones rotas de Streamlit.
-    """
-    buffered = BytesIO()
-    imagen_pil.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-    return f"data:image/png;base64,{img_str}"
-
-# -----------------------------------------------------------------------------
-# 2. BASE DE DATOS DE ASPERSORES
+# 1. BASE DE DATOS DE ASPERSORES
 # -----------------------------------------------------------------------------
 CATALOGO_ASPERSORES = {
     "Pequeños (Jardines/Residencial)": {
@@ -60,7 +45,7 @@ CATALOGO_ASPERSORES = {
 }
 
 # -----------------------------------------------------------------------------
-# 3. LÓGICA Y FUNCIONES
+# 2. LÓGICA Y FUNCIONES
 # -----------------------------------------------------------------------------
 
 def auto_detectar_verde(pil_image, h_min, s_min, v_min, h_max, s_max):
@@ -167,7 +152,7 @@ def generar_pdf_reporte(img_resultado, n_asp, q_total, q_zona, hf_psi, materiale
     return pdf.output(dest='S').encode('latin-1'), tmp_path
 
 # -----------------------------------------------------------------------------
-# 4. INTERFAZ DE USUARIO (STREAMLIT)
+# 3. INTERFAZ DE USUARIO (STREAMLIT)
 # -----------------------------------------------------------------------------
 
 st.set_page_config(page_title="Master Riego Pro", layout="wide")
@@ -210,11 +195,6 @@ if uploaded_file:
     h_size = int((float(image.size[1]) * float(w_percent)))
     bg_image = image.resize((canvas_width, h_size))
     
-    # === AQUI ESTÁ LA SOLUCIÓN AL ERROR ===
-    # Convertimos la imagen a una URL base64 en lugar de pasar el objeto PIL
-    bg_image_url = convertir_imagen_a_base64(bg_image)
-    # ======================================
-
     ESCALA = canvas_width / ancho_real
     
     tab_manual, tab_auto, tab_res = st.tabs(["✍️ 1. Dibujo Manual", "🤖 2. Detección Auto", "📊 3. Resultados y PDF"])
@@ -226,7 +206,7 @@ if uploaded_file:
         st.info("Dibuja el polígono del área a regar.")
         canvas = st_canvas(
             fill_color="rgba(0, 255, 0, 0.2)", stroke_width=2, stroke_color="green",
-            background_image=bg_image_url, # Usamos la versión Base64
+            background_image=bg_image,  # <--- AQUÍ PASAMOS LA IMAGEN REAL (NO STRING)
             height=h_size, width=canvas_width,
             drawing_mode="polygon", key="cv_manual"
         )
