@@ -189,7 +189,7 @@ num_zonas = st.sidebar.selectbox("Zonas de riego:", [1, 2, 3, 4], index=1)
 uploaded_file = st.file_uploader("Sube imagen aérea (JPG/PNG)", type=["png", "jpg", "jpeg"])
 
 if uploaded_file:
-    image = Image.open(uploaded_file)
+    image = Image.open(uploaded_file).convert("RGB")
     canvas_width = 700
     w_percent = (canvas_width / float(image.size[0]))
     h_size = int((float(image.size[1]) * float(w_percent)))
