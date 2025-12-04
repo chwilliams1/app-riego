@@ -1,5 +1,37 @@
+import sys
+import types
 import streamlit as st
-import streamlit.image as st_image
+
+# =============================================================================
+# 🚑 PARCHE DE CIRUGÍA MAYOR: COMPATIBILIDAD FORZADA
+# =============================================================================
+# Este bloque detecta si falta el módulo 'streamlit.image' (típico en versiones nuevas)
+# y lo crea manualmente en la memoria para que la librería de dibujo no falle.
+
+if "streamlit.image" not in sys.modules:
+    # 1. Creamos un módulo "fantasma" llamado streamlit.image
+    mock_image_module = types.ModuleType("streamlit.image")
+    
+    # 2. Buscamos la función real 'image_to_url' donde vive ahora (Streamlit 1.35+)
+    try:
+        from streamlit.elements.image import image_to_url
+    except ImportError:
+        # Si no la encontramos, creamos una dummy para que no explote
+        def image_to_url(image, width, clamp, channels, output_format, image_id, allow_emoji=False):
+            return "" 
+    
+    # 3. Le pegamos la función al módulo fantasma
+    mock_image_module.image_to_url = image_to_url
+    
+    # 4. Inyectamos el módulo en el sistema y en streamlit
+    sys.modules["streamlit.image"] = mock_image_module
+    # Intentamos pegarlo a 'st' también por seguridad
+    if not hasattr(st, 'image'):
+        st.image = mock_image_module
+
+# =============================================================================
+
+# --- AHORA SÍ CARGAMOS EL RESTO ---
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
@@ -8,23 +40,6 @@ from shapely.geometry import Point, Polygon
 from fpdf import FPDF
 import tempfile
 import os
-
-# =============================================================================
-# 🚑 MONKEY PATCH: SOLUCIÓN DE EMERGENCIA PARA STREAMLIT CLOUD
-# =============================================================================
-# Este bloque arregla el error "AttributeError: image_to_url" si el servidor
-# instala una versión demasiado nueva de Streamlit.
-if not hasattr(st_image, "image_to_url"):
-    try:
-        # Intentamos buscar la función donde se movió en versiones nuevas (1.35+)
-        from streamlit.elements.image import image_to_url
-        st_image.image_to_url = image_to_url
-    except ImportError:
-        # Si falla, definimos una función dummy para que no rompa la app
-        def image_to_url(image, width, clamp, channels, output_format, image_id, allow_emoji=False):
-            return "" # Esto podría fallar visualmente pero evita el crash inicial
-        st_image.image_to_url = image_to_url
-# =============================================================================
 
 # -----------------------------------------------------------------------------
 # 1. BASE DE DATOS DE ASPERSORES
@@ -204,7 +219,7 @@ num_zonas = st.sidebar.selectbox("Zonas de riego:", [1, 2, 3, 4], index=1)
 uploaded_file = st.file_uploader("Sube imagen aérea (JPG/PNG)", type=["png", "jpg", "jpeg"])
 
 if uploaded_file:
-    # Convertimos a RGB siempre
+    # Convertimos a RGB siempre (Esto arregla el problema del canvas negro)
     image = Image.open(uploaded_file).convert("RGB")
     
     canvas_width = 700
@@ -221,7 +236,7 @@ if uploaded_file:
     with tab_manual:
         st.info("Dibuja el polígono del área a regar.")
         
-        # El canvas funcionará ahora gracias al "Monkey Patch" del inicio
+        # El canvas funcionará ahora gracias al "Parche" del inicio
         canvas = st_canvas(
             fill_color="rgba(0, 255, 0, 0.2)", stroke_width=2, stroke_color="green",
             background_image=bg_image, 
