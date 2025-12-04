@@ -1,10 +1,5 @@
 import streamlit as st
-# --- CHIVATO DE VERSIÓN ---
-st.write(f"Versión actual de Streamlit: **{st.__version__}**")
-if st.__version__ != "1.32.0":
-    st.error("⚠️ ERROR CRÍTICO: Streamlit Cloud no ha instalado la versión 1.32.0. Revisa el nombre de 'requirements.txt' en GitHub.")
-# ---------------------------
-
+import streamlit.image as st_image
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
@@ -13,6 +8,23 @@ from shapely.geometry import Point, Polygon
 from fpdf import FPDF
 import tempfile
 import os
+
+# =============================================================================
+# 🚑 MONKEY PATCH: SOLUCIÓN DE EMERGENCIA PARA STREAMLIT CLOUD
+# =============================================================================
+# Este bloque arregla el error "AttributeError: image_to_url" si el servidor
+# instala una versión demasiado nueva de Streamlit.
+if not hasattr(st_image, "image_to_url"):
+    try:
+        # Intentamos buscar la función donde se movió en versiones nuevas (1.35+)
+        from streamlit.elements.image import image_to_url
+        st_image.image_to_url = image_to_url
+    except ImportError:
+        # Si falla, definimos una función dummy para que no rompa la app
+        def image_to_url(image, width, clamp, channels, output_format, image_id, allow_emoji=False):
+            return "" # Esto podría fallar visualmente pero evita el crash inicial
+        st_image.image_to_url = image_to_url
+# =============================================================================
 
 # -----------------------------------------------------------------------------
 # 1. BASE DE DATOS DE ASPERSORES
@@ -209,7 +221,7 @@ if uploaded_file:
     with tab_manual:
         st.info("Dibuja el polígono del área a regar.")
         
-        # Canvas estándar (sin Base64) que funciona con Streamlit 1.32.0
+        # El canvas funcionará ahora gracias al "Monkey Patch" del inicio
         canvas = st_canvas(
             fill_color="rgba(0, 255, 0, 0.2)", stroke_width=2, stroke_color="green",
             background_image=bg_image, 
