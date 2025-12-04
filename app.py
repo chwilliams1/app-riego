@@ -1,4 +1,10 @@
 import streamlit as st
+# --- CHIVATO DE VERSIÓN ---
+st.write(f"Versión actual de Streamlit: **{st.__version__}**")
+if st.__version__ != "1.32.0":
+    st.error("⚠️ ERROR CRÍTICO: Streamlit Cloud no ha instalado la versión 1.32.0. Revisa el nombre de 'requirements.txt' en GitHub.")
+# ---------------------------
+
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
@@ -49,7 +55,7 @@ CATALOGO_ASPERSORES = {
 # -----------------------------------------------------------------------------
 
 def auto_detectar_verde(pil_image, h_min, s_min, v_min, h_max, s_max):
-    img_np = np.array(pil_image.convert('RGB'))
+    img_np = np.array(pil_image)
     img_hsv = cv2.cvtColor(img_np, cv2.COLOR_RGB2HSV)
     lower_green = np.array([h_min, s_min, v_min])
     upper_green = np.array([h_max, s_max, v_max])
@@ -96,7 +102,7 @@ def calcular_posiciones_aspersores(modo, datos_geo, radio_metros, escala_pix_por
     return aspersores_validos, R_pix
 
 def dibujar_resultado_opencv(pil_image, aspersores_coords, radio_pix):
-    img_np = np.array(pil_image.convert('RGB'))
+    img_np = np.array(pil_image)
     r_int = int(round(radio_pix))
     for (cx, cy) in aspersores_coords:
         cv2.circle(img_np, (cx, cy), r_int, (0, 150, 255), 2)
@@ -158,22 +164,19 @@ def generar_pdf_reporte(img_resultado, n_asp, q_total, q_zona, hf_psi, materiale
 st.set_page_config(page_title="Master Riego Pro", layout="wide")
 st.title("💧 Sistema Profesional de Diseño de Riego")
 
-# --- SIDEBAR: PARÁMETROS ---
+# --- SIDEBAR ---
 st.sidebar.header("1. Configuración de Terreno")
 ancho_real = st.sidebar.number_input("Ancho real imagen (m):", value=40.0, step=1.0)
 
 st.sidebar.markdown("---")
 st.sidebar.header("2. Selección de Aspersor")
 
-# Selector de Catálogo
 cat_keys = list(CATALOGO_ASPERSORES.keys())
 categoria = st.sidebar.selectbox("Tipo de Proyecto:", cat_keys)
 mod_keys = list(CATALOGO_ASPERSORES[categoria].keys())
 modelo_seleccionado = st.sidebar.selectbox("Modelo de Aspersor:", mod_keys)
-
-# Obtener datos del modelo
 datos_modelo = CATALOGO_ASPERSORES[categoria][modelo_seleccionado]
-st.sidebar.caption(f"Tipo: {datos_modelo['tipo']} | Presión Sugerida: {datos_modelo['presion_psi']} PSI")
+st.sidebar.caption(f"Tipo: {datos_modelo['tipo']} | Presión: {datos_modelo['presion_psi']} PSI")
 
 col1, col2 = st.sidebar.columns(2)
 radio_asp = col1.number_input("Radio (m):", value=float(datos_modelo["radio"]), format="%.1f", key=f"rad_{modelo_seleccionado}")
@@ -185,11 +188,13 @@ diametro_tubo = st.sidebar.number_input("Diámetro tubería (mm):", value=40.0)
 largo_tubo = st.sidebar.number_input("Longitud tubería (m):", value=60.0)
 num_zonas = st.sidebar.selectbox("Zonas de riego:", [1, 2, 3, 4], index=1)
 
-# --- APP PRINCIPAL ---
+# --- APP ---
 uploaded_file = st.file_uploader("Sube imagen aérea (JPG/PNG)", type=["png", "jpg", "jpeg"])
 
 if uploaded_file:
+    # Convertimos a RGB siempre
     image = Image.open(uploaded_file).convert("RGB")
+    
     canvas_width = 700
     w_percent = (canvas_width / float(image.size[0]))
     h_size = int((float(image.size[1]) * float(w_percent)))
@@ -199,14 +204,15 @@ if uploaded_file:
     
     tab_manual, tab_auto, tab_res = st.tabs(["✍️ 1. Dibujo Manual", "🤖 2. Detección Auto", "📊 3. Resultados y PDF"])
     
-    # Variables de estado
     poly_manual = []
     
     with tab_manual:
         st.info("Dibuja el polígono del área a regar.")
+        
+        # Canvas estándar (sin Base64) que funciona con Streamlit 1.32.0
         canvas = st_canvas(
             fill_color="rgba(0, 255, 0, 0.2)", stroke_width=2, stroke_color="green",
-            background_image=bg_image,  # <--- AQUÍ PASAMOS LA IMAGEN REAL (NO STRING)
+            background_image=bg_image, 
             height=h_size, width=canvas_width,
             drawing_mode="polygon", key="cv_manual"
         )
@@ -216,7 +222,7 @@ if uploaded_file:
             if st.button("Usar Diseño Manual"):
                 st.session_state['modo_activo'] = 'manual'
                 st.session_state['datos_geo'] = poly_manual
-                st.success("✅ Diseño manual seleccionado. Ve a la pestaña 'Resultados'.")
+                st.success("✅ Diseño manual seleccionado.")
 
     with tab_auto:
         st.info("Ajusta sliders para aislar el verde. Negro = Obstáculo.")
@@ -231,20 +237,19 @@ if uploaded_file:
         mask_result = auto_detectar_verde(bg_image, h_min, s_min, v_min, h_max, s_max)
         col_a, col_b = st.columns(2)
         col_a.image(bg_image, caption="Original", use_column_width=True)
-        col_b.image(mask_result, caption="Máscara (Blanco=Riego, Negro=No Riego)", use_column_width=True)
+        col_b.image(mask_result, caption="Máscara", use_column_width=True)
         
         if st.button("Usar Detección Automática"):
             st.session_state['modo_activo'] = 'auto'
             st.session_state['datos_geo'] = mask_result
-            st.success("✅ Diseño automático seleccionado. Ve a la pestaña 'Resultados'.")
+            st.success("✅ Diseño automático seleccionado.")
 
     with tab_res:
         st.write("---")
         if 'modo_activo' in st.session_state and 'datos_geo' in st.session_state:
-            st.markdown(f"### Modo Activo: **{st.session_state['modo_activo'].upper()}**")
+            st.markdown(f"### Modo: **{st.session_state['modo_activo'].upper()}**")
             
             if st.button("⚙️ Generar Distribución y Cálculo", type="primary"):
-                # 1. Calcular Ubicación
                 aspersores, r_pix = calcular_posiciones_aspersores(
                     st.session_state['modo_activo'], 
                     st.session_state['datos_geo'], 
@@ -252,43 +257,35 @@ if uploaded_file:
                     ESCALA
                 )
                 
-                # 2. Dibujar en Mapa
                 img_final = dibujar_resultado_opencv(bg_image, aspersores, r_pix)
                 st.image(img_final, caption="Propuesta de Distribución", channels="RGB")
                 
-                # 3. Calcular Hidráulica
                 num_asp = len(aspersores)
                 q_tot, q_zona, hf = calcular_hidraulica(num_asp, q_asp, diametro_tubo, largo_tubo, num_zonas)
                 
-                # 4. Mostrar Métricas
                 m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total Aspersores", num_asp)
-                m2.metric("Caudal Total", f"{q_tot:.1f} L/min")
-                m3.metric("Caudal por Zona", f"{q_zona:.1f} L/min")
+                m1.metric("Aspersores", num_asp)
+                m2.metric("Caudal Total", f"{q_tot:.1f}")
+                m3.metric("Caudal/Zona", f"{q_zona:.1f}")
                 m4.metric("Pérdida Presión", f"{hf:.2f} PSI", delta_color="inverse")
                 
-                if hf > (datos_modelo["presion_psi"] * 0.2):
-                    st.warning(f"⚠️ ¡Atención! La pérdida de presión es alta ({hf:.1f} PSI). Considera aumentar el diámetro de la tubería.")
-
-                # 5. Generar PDF
                 materiales = {
                     f"Aspersores ({modelo_seleccionado})": num_asp,
-                    "Tubería Principal (estimado)": f"{largo_tubo} m",
-                    "Válvulas Solenoides": num_zonas,
-                    "Conectores varios (aprox)": int(num_asp * 2),
-                    "Controlador de Riego": 1
+                    "Tubería": f"{largo_tubo} m",
+                    "Válvulas": num_zonas,
+                    "Conectores": int(num_asp * 2),
+                    "Controlador": 1
                 }
                 pdf_bytes, tmp_path = generar_pdf_reporte(img_final, num_asp, q_tot, q_zona, hf, materiales)
                 
                 st.download_button(
-                    label="📄 Descargar Reporte PDF Completo",
+                    label="📄 Descargar PDF",
                     data=pdf_bytes,
-                    file_name="Proyecto_Riego_Gemini.pdf",
+                    file_name="Proyecto_Riego.pdf",
                     mime="application/pdf"
                 )
-                
                 if os.path.exists(tmp_path): os.remove(tmp_path)
         else:
-            st.info("👈 Por favor, dibuja el área (Manual) o ajusta la máscara (Auto) y presiona el botón 'Usar' antes de ver los resultados.")
+            st.info("👈 Confirma un diseño primero.")
 else:
-    st.info("👆 Sube una imagen aérea para comenzar.")
+    st.info("👆 Sube una imagen.")
