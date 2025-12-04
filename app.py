@@ -9,7 +9,43 @@ import tempfile
 import os
 
 # -----------------------------------------------------------------------------
-# SECCIÓN 1: LÓGICA Y FUNCIONES (Matemáticas, Visión Artificial, PDF)
+# BASE DE DATOS DE ASPERSORES (Catálogo)
+# -----------------------------------------------------------------------------
+CATALOGO_ASPERSORES = {
+    "Pequeños (Jardines/Residencial)": {
+        "Hunter MP Rotator 1000 (Eficiente)": {
+            "radio": 4.0, "caudal_lpm": 2.3, "presion_psi": 40, "tipo": "Rotator"
+        },
+        "Rain Bird 1804 - Tobera 15VAN (Spray)": {
+            "radio": 4.5, "caudal_lpm": 14.0, "presion_psi": 30, "tipo": "Difusor"
+        },
+        "Hunter PSU - Tobera 10A (Spray Corto)": {
+            "radio": 3.0, "caudal_lpm": 9.5, "presion_psi": 30, "tipo": "Difusor"
+        }
+    },
+    "Medianos (Parques/Comercial)": {
+        "Rain Bird 3500 (Rotor Corto)": {
+            "radio": 7.0, "caudal_lpm": 8.5, "presion_psi": 35, "tipo": "Rotor"
+        },
+        "Rain Bird 5004 - Boquilla 3.0 (Estándar)": {
+            "radio": 11.0, "caudal_lpm": 13.5, "presion_psi": 45, "tipo": "Rotor"
+        },
+        "Hunter PGP Ultra - Boquilla 2.5": {
+            "radio": 10.5, "caudal_lpm": 11.0, "presion_psi": 45, "tipo": "Rotor"
+        }
+    },
+    "Grandes (Canchas/Deportivo)": {
+        "Rain Bird 8005 (Largo Alcance)": {
+            "radio": 18.0, "caudal_lpm": 55.0, "presion_psi": 60, "tipo": "Cañón"
+        },
+        "Hunter I-40 (Acero Inoxidable)": {
+            "radio": 16.0, "caudal_lpm": 48.0, "presion_psi": 60, "tipo": "Cañón"
+        }
+    }
+}
+
+# -----------------------------------------------------------------------------
+# LÓGICA Y FUNCIONES
 # -----------------------------------------------------------------------------
 
 def auto_detectar_verde(pil_image, h_min, s_min, v_min, h_max, s_max):
@@ -83,10 +119,10 @@ def generar_pdf_reporte(img_resultado, n_asp, q_total, q_zona, hf_psi, materiale
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "Reporte de Diseño de Riego Automatizado", ln=True, align='C')
+    pdf.cell(0, 10, "Reporte de Diseno de Riego", ln=True, align='C')
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
-    pdf.cell(0, 10, "1. Visualización del Diseño:", ln=True)
+    pdf.cell(0, 10, "1. Visualizacion del Diseno:", ln=True)
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
         from PIL import Image
@@ -97,12 +133,12 @@ def generar_pdf_reporte(img_resultado, n_asp, q_total, q_zona, hf_psi, materiale
 
     pdf.ln(5)
     pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, "2. Cálculos Hidráulicos:", ln=True)
+    pdf.cell(0, 10, "2. Calculos Hidraulicos:", ln=True)
     pdf.set_font("Arial", size=11)
     pdf.cell(0, 8, f"Total de Aspersores: {n_asp}", ln=True)
     pdf.cell(0, 8, f"Caudal Total del Sistema: {q_total:.2f} L/min", ln=True)
     pdf.cell(0, 8, f"Caudal por Zona: {q_zona:.2f} L/min", ln=True)
-    pdf.cell(0, 8, f"Pérdida de Carga Estimada: {hf_psi:.2f} PSI", ln=True)
+    pdf.cell(0, 8, f"Perdida de Carga Estimada: {hf_psi:.2f} PSI", ln=True)
     
     pdf.ln(5)
     pdf.set_font("Arial", 'B', 14)
@@ -116,23 +152,42 @@ def generar_pdf_reporte(img_resultado, n_asp, q_total, q_zona, hf_psi, materiale
     return pdf.output(dest='S').encode('latin-1'), tmp_path
 
 # -----------------------------------------------------------------------------
-# SECCIÓN 2: INTERFAZ DE USUARIO (Streamlit)
+# INTERFAZ DE USUARIO (STREAMLIT)
 # -----------------------------------------------------------------------------
 
-st.set_page_config(page_title="Master Riego IA", layout="wide")
-st.title("💧 Sistema Integral de Diseño de Riego")
+st.set_page_config(page_title="Master Riego Pro", layout="wide")
+st.title("💧 Sistema Profesional de Diseño de Riego")
 
-st.sidebar.header("1. Parámetros de Terreno")
+# --- SIDEBAR: PARÁMETROS ---
+st.sidebar.header("1. Configuración de Terreno")
 ancho_real = st.sidebar.number_input("Ancho real imagen (m):", value=40.0, step=1.0)
-radio_asp = st.sidebar.number_input("Radio aspersor (m):", value=5.0)
 
 st.sidebar.markdown("---")
-st.sidebar.header("2. Hidráulica")
-q_asp = st.sidebar.number_input("Consumo aspersor (L/min):", value=12.0)
+st.sidebar.header("2. Selección de Aspersor")
+
+# Selector de Catálogo
+cat_keys = list(CATALOGO_ASPERSORES.keys())
+categoria = st.sidebar.selectbox("Tipo de Proyecto:", cat_keys)
+mod_keys = list(CATALOGO_ASPERSORES[categoria].keys())
+modelo_seleccionado = st.sidebar.selectbox("Modelo de Aspersor:", mod_keys)
+
+# Obtener datos del modelo
+datos_modelo = CATALOGO_ASPERSORES[categoria][modelo_seleccionado]
+st.sidebar.caption(f"Tipo: {datos_modelo['tipo']} | Presión Sugerida: {datos_modelo['presion_psi']} PSI")
+
+# Inputs editables (Se rellenan con la info del catálogo)
+# Usamos 'key' dinámico para forzar la actualización si cambia el modelo
+col1, col2 = st.sidebar.columns(2)
+radio_asp = col1.number_input("Radio (m):", value=float(datos_modelo["radio"]), format="%.1f", key=f"rad_{modelo_seleccionado}")
+q_asp = col2.number_input("Caudal (L/min):", value=float(datos_modelo["caudal_lpm"]), format="%.1f", key=f"caud_{modelo_seleccionado}")
+
+st.sidebar.markdown("---")
+st.sidebar.header("3. Tubería y Zonas")
 diametro_tubo = st.sidebar.number_input("Diámetro tubería (mm):", value=40.0)
 largo_tubo = st.sidebar.number_input("Longitud tubería (m):", value=60.0)
 num_zonas = st.sidebar.selectbox("Zonas de riego:", [1, 2, 3, 4], index=1)
 
+# --- APP PRINCIPAL ---
 uploaded_file = st.file_uploader("Sube imagen aérea (JPG/PNG)", type=["png", "jpg", "jpeg"])
 
 if uploaded_file:
@@ -143,8 +198,9 @@ if uploaded_file:
     bg_image = image.resize((canvas_width, h_size))
     ESCALA = canvas_width / ancho_real
     
-    tab_manual, tab_auto, tab_res = st.tabs(["✍️ Manual", "🤖 Automático (con Obstáculos)", "📊 Reporte y Resultados"])
+    tab_manual, tab_auto, tab_res = st.tabs(["✍️ 1. Dibujo Manual", "🤖 2. Detección Auto", "📊 3. Resultados y PDF"])
     
+    # Variables de estado
     poly_manual = []
     
     with tab_manual:
@@ -160,10 +216,10 @@ if uploaded_file:
             if st.button("Usar Diseño Manual"):
                 st.session_state['modo_activo'] = 'manual'
                 st.session_state['datos_geo'] = poly_manual
-                st.success("Diseño manual seleccionado.")
+                st.success("✅ Diseño manual seleccionado. Ve a la pestaña 'Resultados'.")
 
     with tab_auto:
-        st.info("Ajusta sliders. Negro = Obstáculo.")
+        st.info("Ajusta sliders para aislar el verde. Negro = Obstáculo.")
         c1, c2, c3 = st.columns(3)
         h_min = c1.slider("H Min", 0, 179, 30)
         h_max = c1.slider("H Max", 0, 179, 90)
@@ -175,36 +231,64 @@ if uploaded_file:
         mask_result = auto_detectar_verde(bg_image, h_min, s_min, v_min, h_max, s_max)
         col_a, col_b = st.columns(2)
         col_a.image(bg_image, caption="Original", use_column_width=True)
-        col_b.image(mask_result, caption="Máscara", use_column_width=True)
+        col_b.image(mask_result, caption="Máscara (Blanco=Riego, Negro=No Riego)", use_column_width=True)
         
         if st.button("Usar Detección Automática"):
             st.session_state['modo_activo'] = 'auto'
             st.session_state['datos_geo'] = mask_result
-            st.success("Diseño automático seleccionado.")
+            st.success("✅ Diseño automático seleccionado. Ve a la pestaña 'Resultados'.")
 
     with tab_res:
+        st.write("---")
         if 'modo_activo' in st.session_state and 'datos_geo' in st.session_state:
-            st.write(f"Modo: **{st.session_state['modo_activo'].upper()}**")
-            if st.button("⚙️ Generar Diseño", type="primary"):
-                aspersores, r_pix = calcular_posiciones_aspersores(st.session_state['modo_activo'], st.session_state['datos_geo'], radio_asp, ESCALA)
-                img_final = dibujar_resultado_opencv(bg_image, aspersores, r_pix)
-                st.image(img_final, caption="Diseño Propuesto", channels="RGB")
+            st.markdown(f"### Modo Activo: **{st.session_state['modo_activo'].upper()}**")
+            
+            if st.button("⚙️ Generar Distribución y Cálculo", type="primary"):
+                # 1. Calcular Ubicación
+                aspersores, r_pix = calcular_posiciones_aspersores(
+                    st.session_state['modo_activo'], 
+                    st.session_state['datos_geo'], 
+                    radio_asp, 
+                    ESCALA
+                )
                 
+                # 2. Dibujar en Mapa
+                img_final = dibujar_resultado_opencv(bg_image, aspersores, r_pix)
+                st.image(img_final, caption="Propuesta de Distribución", channels="RGB")
+                
+                # 3. Calcular Hidráulica
                 num_asp = len(aspersores)
                 q_tot, q_zona, hf = calcular_hidraulica(num_asp, q_asp, diametro_tubo, largo_tubo, num_zonas)
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Aspersores", num_asp)
-                c2.metric("Caudal/Zona", f"{q_zona:.1f} L/min")
-                c3.metric("Pérdida Presión", f"{hf:.2f} PSI")
                 
+                # 4. Mostrar Métricas
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Total Aspersores", num_asp)
+                m2.metric("Caudal Total", f"{q_tot:.1f} L/min")
+                m3.metric("Caudal por Zona", f"{q_zona:.1f} L/min")
+                m4.metric("Pérdida Presión", f"{hf:.2f} PSI", delta_color="inverse")
+                
+                if hf > (datos_modelo["presion_psi"] * 0.2):
+                    st.warning(f"⚠️ ¡Atención! La pérdida de presión es alta ({hf:.1f} PSI). Considera aumentar el diámetro de la tubería.")
+
+                # 5. Generar PDF
                 materiales = {
-                    "Aspersores": num_asp, "Tubería (m)": f"{largo_tubo} m",
-                    "Válvulas": num_zonas, "Conectores estim": int(num_asp * 1.5)
+                    f"Aspersores ({modelo_seleccionado})": num_asp,
+                    "Tubería Principal (estimado)": f"{largo_tubo} m",
+                    "Válvulas Solenoides": num_zonas,
+                    "Conectores varios (aprox)": int(num_asp * 2),
+                    "Controlador de Riego": 1
                 }
                 pdf_bytes, tmp_path = generar_pdf_reporte(img_final, num_asp, q_tot, q_zona, hf, materiales)
-                st.download_button("📄 Descargar PDF", data=pdf_bytes, file_name="riego.pdf", mime="application/pdf")
+                
+                st.download_button(
+                    label="📄 Descargar Reporte PDF Completo",
+                    data=pdf_bytes,
+                    file_name="Proyecto_Riego_Gemini.pdf",
+                    mime="application/pdf"
+                )
+                
                 if os.path.exists(tmp_path): os.remove(tmp_path)
         else:
-            st.info("Selecciona un diseño primero.")
+            st.info("👈 Por favor, dibuja el área (Manual) o ajusta la máscara (Auto) y presiona el botón 'Usar' antes de ver los resultados.")
 else:
-    st.info("Sube una imagen.")
+    st.info("👆 Sube una imagen aérea para comenzar.")
